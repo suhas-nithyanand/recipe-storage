@@ -20,6 +20,14 @@
 </head>
 
 <body>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.3.7.min.js"></script>
+	<script>
+  AWS.config.region = '<REGION>';
+	AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+    IdentityPoolId: '<IDENTITY_POOL_ID>'
+  });
+  var lambda = new AWS.Lambda();
+	</script>
 
 <nav class="navbar navbar-toggleable-md  navbar-inverse bg-inverse" >
   <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
@@ -67,7 +75,7 @@
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Register</h5>
+        <h5 class="modal-title" id="registerLabel">Register</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
@@ -76,15 +84,15 @@
       <form>
           <div class="form-group">
             <label for="recipient-name" class="form-control-label">Email:</label>
-            <input type="text" class="form-control" id="email">
+            <input type="text" class="form-control" id="remail">
           </div>
           <div class="form-group">
             <label for="text" class="form-control-label">Password:</label>
-            <input type="password" class="form-control" id="password"></input>
+            <input type="password" class="form-control" id="rpassword"></input>
           </div>
           <div class="form-group">
             <label for="text" class="form-control-label">Confirm Password:</label>
-            <input type="password" class="form-control" id="password"></input>
+            <input type="password" class="form-control" id="rcpassword"></input>
           </div>
         </form>
       </div>
@@ -100,7 +108,7 @@
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Login</h5>
+        <h5 class="modal-title" id="loginLabel">Login</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
@@ -109,18 +117,18 @@
        <form>
           <div class="form-group">
             <label for="recipient-name" class="form-control-label">Email:</label>
-            <input type="text" class="form-control" id="email">
+            <input type="text" class="form-control" id="lemail">
           </div>
           <div class="form-group">
             <label  type="password" 
              class="form-control-label">Password:</label>
-            <input class="form-control" id="password"></input>
+            <input class="form-control" id="lpassword"></input>
           </div>
         </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary">Login</button>
+        <button type="login-button" class="btn btn-primary">Login</button>
       </div>
     </div>
   </div>
@@ -130,7 +138,7 @@
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Change Password</h5>
+        <h5 class="modal-title" id="changePasswordLabel">Change Password</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
@@ -167,7 +175,7 @@
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Reset Password</h5>
+        <h5 class="modal-title" id="resetPasswordLabel">Reset Password</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
@@ -188,6 +196,177 @@
   </div>
 </div>
 
+<!--Function for login-->
+  <script>
+  var info = document.getElementById('loginLabel');
+  var email = document.getElementById('lemail');
+  var password = document.getElementById('lpassword');
+  var loginButton = document.getElementById('login-button');
+  loginButton.addEventListener('click', function() {
+    info.innerHTML = 'Login...';
+    if (email.value == null || email.value == '') {
+      info.innerHTML = 'Please specify your email address.';
+    } else if (password.value == null || password.value == '') {
+      info.innerHTML = 'Please specify a password.';
+    } else {
+      var input = {
+        email: email.value,
+        password: password.value
+      };
+      lambda.invoke({
+        FunctionName: 'LambdAuthLogin',
+        Payload: JSON.stringify(input)
+      }, function(err, data) {
+        if (err) console.log(err, err.stack);
+        else {
+          var output = JSON.parse(data.Payload);
+          if (!output.login) {
+            info.innerHTML = '<b>Not</b> logged in';
+          } else {
+            info.innerHTML = 'Logged in with IdentityId: ' + output.identityId + '<br>';
+            var creds = AWS.config.credentials;
+	    creds.params.IdentityId = output.identityId;
+	    creds.params.Logins = {
+	      'cognito-identity.amazonaws.com': output.token
+	    };
+	    creds.expired = true;
+	    // Do something with the authenticated role
+          }
+        }
+      });
+		}
+  });
+  </script>
+
+<!--Function for Registering User-->
+<script>
+  var info = document.getElementById('info');
+  var email = document.getElementById('email');
+  var password = document.getElementById('password');
+  var verifyPassword = document.getElementById('verifyPassword');
+  var signupButton = document.getElementById('signup-button');
+  signupButton.addEventListener('click', function() {
+    info.innerHTML = 'Sign Up...';
+		if (email.value == null || email.value == '') {
+    	info.innerHTML = 'Please specify your email address.';
+    } else if (password.value == null || password.value == '') {
+      info.innerHTML = 'Please specify a password.';
+    } else if (password.value != verifyPassword.value) {
+        info.innerHTML = 'Passwords are <b>different</b>, please check.';
+    } else {
+      var input = {
+        email: email.value,
+        password: password.value,
+      };
+      lambda.invoke({
+        FunctionName: 'LambdAuthCreateUser',
+        Payload: JSON.stringify(input)
+      }, function(err, data) {
+        if (err) console.log(err, err.stack);
+        else {
+          var output = JSON.parse(data.Payload);
+          if (output.created) {
+            info.innerHTML = 'User ' + input.email + ' created. Please check your email to validate the user and enable login.';
+          } else {
+            info.innerHTML = 'User <b>not</b> created.';
+          }
+        }
+      });
+    }
+  });
+  </script>
+
+
+<!--Function for Lost Password-->
+<script>
+  var info = document.getElementById('info');
+  var email = document.getElementById('email');
+  var lostButton = document.getElementById('lost-button');
+  lostButton.addEventListener('click', function() {
+    info.innerHTML = 'Password Lost...';
+		if (email.value == null || email.value == '') {
+    	info.innerHTML = 'Please specify your email address.';
+		} else {
+      var input = {
+        email: email.value
+      };
+      lambda.invoke({
+        FunctionName: 'LambdAuthLostPassword',
+        Payload: JSON.stringify(input)
+      }, function(err, data) {
+        if (err) console.log(err, err.stack);
+        else {
+          var output = JSON.parse(data.Payload);
+          if (output.sent) {
+            info.innerHTML = 'Email sent. Please check your email to reset your password.';
+          } else {
+            info.innerHTML = 'Email <b>not</b> sent.';
+          }
+        }
+      });
+		}
+  });
+  </script>
+
+<!--Function for Reset Password-->
+<script>
+  function getUrlParams() {
+    var p = {};
+    var match,
+      pl     = /\+/g,  // Regex for replacing addition symbol with a space
+      search = /([^&=]+)=?([^&]*)/g,
+      decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+      query  = window.location.search.substring(1);
+
+    while (match = search.exec(query))
+      p[decode(match[1])] = decode(match[2]);
+    return p;
+  }
+  var resetPasswordButton = document.getElementById('reset-password-button');
+  var password = document.getElementById('password');
+  var verifyPassword = document.getElementById('verifyPassword');
+  var info = document.getElementById('info');
+  var urlParams = getUrlParams();
+	var email = urlParams['email'] || null;
+	var lost = urlParams['lost'] || null;
+	if (email) {
+		info.innerHTML = 'Type your new password for user ' + email;
+	}
+  resetPasswordButton.addEventListener('click', function() {
+		if (password.value == null || password.value == '') {
+      info.innerHTML = 'Please specify a password.';
+    } else if (password.value != verifyPassword.value) {
+      info.innerHTML = 'Passwords are <b>not</b> the same, please check.';
+    } else {
+	    if ((!email)||(!lost)) {
+	      info.innerHTML = 'Please specify email and lost token in the URL.';
+	    } else {
+		    info.innerHTML = 'Trying to reset password for user ' + email + ' ...';
+	      var input = {
+	        email: email,
+	        lost: lost,
+					password: password.value
+	      };
+	      lambda.invoke({
+	        FunctionName: 'LambdAuthResetPassword',
+	        Payload: JSON.stringify(input)
+	      }, function(err, data) {
+	        if (err) console.log(err, err.stack);
+	        else {
+	          var output = JSON.parse(data.Payload);
+	          if (output.changed) {
+	            info.innerHTML = 'Password changed for user ' + email;
+	          } else {
+	            info.innerHTML = 'Password <b>not</b> changed.';
+	          }
+	        }
+	      });
+	    }
+    }
+	});
+  </script>
+
+<!--Validation by printing in console-->
 <script>
   function ValidationEvent() {
     console.log('The following values were submitted in the form:');
